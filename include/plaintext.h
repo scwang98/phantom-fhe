@@ -36,7 +36,9 @@ public:
     ~PhantomPlaintext() = default;
 
     void resize(const size_t coeff_modulus_size, const size_t poly_modulus_degree, const cudaStream_t &stream) {
-        data_ = phantom::util::make_cuda_auto_ptr<uint64_t>(coeff_modulus_size * poly_modulus_degree, stream);
+        if (data_.get_n() != coeff_modulus_size * poly_modulus_degree && data_.get_stream() != stream) {
+            data_ = phantom::util::make_cuda_auto_ptr<uint64_t>(coeff_modulus_size * poly_modulus_degree, stream);
+        }
 
         coeff_modulus_size_ = coeff_modulus_size;
         poly_modulus_degree_ = poly_modulus_degree;

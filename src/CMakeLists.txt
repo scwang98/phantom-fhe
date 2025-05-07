@@ -35,6 +35,11 @@ add_library(Phantom SHARED
         host/uintarithmod.cu
         host/uintarithsmallmod.cu
 )
+target_include_directories(Phantom
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+        $<INSTALL_INTERFACE:include/phantom>
+)
 
 target_compile_options(Phantom PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--default-stream per-thread>)
 target_compile_options(Phantom PRIVATE $<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CUDA>>:-G;-src-in-ptx>)

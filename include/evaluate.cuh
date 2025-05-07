@@ -89,6 +89,11 @@ namespace phantom {
         return destination;
     }
 
+    inline void sub_plain(const PhantomContext &context, const PhantomCiphertext &encrypted, const PhantomPlaintext &plain, PhantomCiphertext &destination) {
+        destination = encrypted;
+        sub_plain_inplace(context, destination, plain);
+    }
+
     // encrypted *= plain
     void
     multiply_plain_inplace(const PhantomContext &context, PhantomCiphertext &encrypted, const PhantomPlaintext &plain);
@@ -98,6 +103,12 @@ namespace phantom {
         PhantomCiphertext destination = encrypted;
         multiply_plain_inplace(context, destination, plain);
         return destination;
+    }
+
+    inline void multiply_plain(const PhantomContext &context, const PhantomCiphertext &encrypted,
+                               const PhantomPlaintext &plain, PhantomCiphertext &destination) {
+        destination = encrypted;
+        multiply_plain_inplace(context, destination, plain);
     }
 
     // encrypted1 *= encrypted2

@@ -18,6 +18,7 @@
 
 #define PHANTOM_CHECK_CUDA(val) check((val), #val, __FILE__, __LINE__)
 #define PHANTOM_CHECK_CUDA_LAST() checkLast(__FILE__, __LINE__)
+#define PHANTOM_CHECK_CUDA_LAST_NO_THROW() checkLast()
 
 template<typename T>
 inline void check(T err, const char *const func, const char *const file,
@@ -39,6 +40,14 @@ inline void checkLast(const char *const file, const int line) {
                   << std::endl;
         std::cerr << cudaGetErrorString(err) << std::endl;
         throw std::runtime_error("CUDA Runtime Error");
+    }
+}
+
+inline void checkLast() {
+    cudaDeviceSynchronize();
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl;
     }
 }
 
@@ -94,13 +103,18 @@ namespace phantom::util {
                 return *this;
             }
 
-            reset();
+            if (obj.cudaStream_ == this->cudaStream_ && obj.n_ == this->n_) {
+                PHANTOM_CHECK_CUDA(cudaMemcpyAsync(this->ptr_, obj.ptr_, obj.n_ * sizeof(T), cudaMemcpyDeviceToDevice,
+                                                   obj.cudaStream_));
+            } else {
+                reset();
 
-            PHANTOM_CHECK_CUDA(cudaMallocAsync(&this->ptr_, obj.n_ * sizeof(T), obj.cudaStream_));
-            PHANTOM_CHECK_CUDA(cudaMemcpyAsync(this->ptr_, obj.ptr_, obj.n_ * sizeof(T), cudaMemcpyDeviceToDevice,
-                                               obj.cudaStream_));
-            this->n_ = obj.n_;
-            this->cudaStream_ = obj.cudaStream_;
+                PHANTOM_CHECK_CUDA(cudaMallocAsync(&this->ptr_, obj.n_ * sizeof(T), obj.cudaStream_));
+                PHANTOM_CHECK_CUDA(cudaMemcpyAsync(this->ptr_, obj.ptr_, obj.n_ * sizeof(T), cudaMemcpyDeviceToDevice,
+                                                   obj.cudaStream_));
+                this->n_ = obj.n_;
+                this->cudaStream_ = obj.cudaStream_;
+            }
             return *this;
         }
 
@@ -177,6 +191,7 @@ namespace phantom::util {
                 std::cerr << "Error code: " << cudaGetErrorString(err) << std::endl;
             }
             n_ = 0;
+            ptr_ = nullptr;
             cudaStream_ = nullptr;
         }
     };

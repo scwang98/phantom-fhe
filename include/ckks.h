@@ -38,6 +38,13 @@ private:
         encode_internal(context, input, chain_index, scale, destination, stream);
     }
 
+    void encode_internal(const PhantomContext &context,
+                         double value,
+                         double scale,
+                         size_t chain_index,
+                         PhantomPlaintext &destination,
+                         const cudaStream_t &stream) const;
+
     void decode_internal(const PhantomContext &context,
                          const PhantomPlaintext &plain,
                          std::vector<cuDoubleComplex> &destination,
@@ -89,6 +96,33 @@ public:
         PhantomPlaintext destination;
         encode(context, values, scale, destination, chain_index);
         return destination;
+    }
+
+    inline void encode(const PhantomContext &context,
+                       const float *values,
+                       size_t values_size,
+                       double scale,
+                       PhantomPlaintext &destination,
+                       size_t chain_index = 1) {
+        const auto &s = cudaStreamPerThread;
+        destination.chain_index_ = 0;
+        destination.resize(context.coeff_mod_size_, context.poly_degree_, s);
+        std::vector<cuDoubleComplex> input(values_size);
+        for (size_t i = 0; i < values_size; i++) {
+            input[i] = make_cuDoubleComplex(values[i], 0.0);
+        }
+        encode_internal(context, input, chain_index, scale, destination, s);
+    }
+
+    inline void encode(const PhantomContext &context,
+                       double value,
+                       double scale,
+                       PhantomPlaintext &destination,
+                       size_t chain_index = 1) const {
+        const auto &s = cudaStreamPerThread;
+        destination.chain_index_ = 0;
+        destination.resize(context.coeff_mod_size_, context.poly_degree_, s);
+        encode_internal(context, value, scale, chain_index, destination, s);
     }
 
     template<class T>

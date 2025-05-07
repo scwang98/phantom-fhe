@@ -1,3 +1,6 @@
+#include <thrust/fill.h>
+#include <thrust/execution_policy.h>
+#include <thrust/device_ptr.h>
 #include "ckks.h"
 #include "fft.h"
 
@@ -129,6 +132,60 @@ void PhantomCKKSEncoder::encode_internal(const PhantomContext &context, const st
                                        stream);
 
     nwt_2d_radix8_forward_inplace(destination.data(), context.gpu_rns_tables(), coeff_modulus_size, 0, stream);
+
+    destination.chain_index_ = chain_index;
+    destination.scale_ = scale;
+}
+
+void PhantomCKKSEncoder::encode_internal(const PhantomContext &context, double value, double scale, size_t chain_index,
+                                         PhantomPlaintext &destination, cudaStream_t const &stream) const {
+    auto &context_data = context.get_context_data(chain_index);
+    auto &parms = context_data.parms();
+    auto &coeff_modulus = parms.coeff_modulus();
+    auto &rns_tool = context_data.gpu_rns_tool();
+    size_t coeff_modulus_size = coeff_modulus.size();
+    size_t coeff_count = parms.poly_modulus_degree();
+
+    // Check that scale is positive and not too large
+    if (scale <= 0 || (static_cast<int>(log2(scale)) + 1 >= context_data.total_coeff_modulus_bit_count())) {
+        throw std::invalid_argument("scale out of bounds");
+    }
+
+    value *= scale;
+
+    int coeff_bit_count = static_cast<int>(log2(fabs(value))) + 2;
+    if (coeff_bit_count >= context_data.total_coeff_modulus_bit_count())
+    {
+        throw invalid_argument("encoded value is too large");
+    }
+
+    double coeffd = round(value);
+    bool is_negative = signbit(coeffd);
+
+    uint64_t coeffu = static_cast<uint64_t>(fabs(coeffd));
+
+    if (is_negative)
+    {
+        for (size_t j = 0; j < coeff_modulus_size; j++)
+        {
+            thrust::fill_n(thrust::cuda::par.on(stream),
+                           thrust::device_ptr<uint64_t>(destination.data()),
+                           coeff_count,
+                           negate_uint_mod(barrett_reduce_64(coeffu, coeff_modulus[j]), coeff_modulus[j])
+            );
+        }
+    }
+    else
+    {
+        for (size_t j = 0; j < coeff_modulus_size; j++)
+        {
+            thrust::fill_n(thrust::cuda::par.on(stream),
+                           thrust::device_ptr<uint64_t>(destination.data()),
+                           coeff_count,
+                           barrett_reduce_64(coeffu, coeff_modulus[j])
+            );
+        }
+    }
 
     destination.chain_index_ = chain_index;
     destination.scale_ = scale;
